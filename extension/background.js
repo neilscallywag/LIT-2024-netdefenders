@@ -34,7 +34,7 @@ function checkPhishing(url, sourceCode) {
 
   // Mocking the fetch response
   setTimeout(() => {
-    const mockResponse = { phishing: true };
+    const mockResponse = { phishing: false };
 
     console.log("Mocked response from backend:", mockResponse);
 
@@ -46,8 +46,11 @@ function checkPhishing(url, sourceCode) {
       });
     } else {
       console.log("No phishing detected.");
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        chrome.tabs.sendMessage(tabs[0].id, { isPhishing: false });
+      });
     }
-  }, 1000); 
+  }, 1000);
   /*
     fetch(apiUrl, {
       method: "POST",
