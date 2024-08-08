@@ -64,5 +64,17 @@ def predict():
 
   return jsonify(output)
 
+@app.route("/whitelist", methods=["GET"])
+def whitelist():
+    # Retrieve all the safe websites from the database
+    websites = collection.find({"safe_status": True})
+
+    whitelist = []
+
+    for website in websites:
+        whitelist.append([website["url"], True])
+
+    return {"links": whitelist}
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True, host='0.0.0.0')
