@@ -4,4 +4,8 @@ huggingface-hub==0.24.5
 numpy==1.26.4
 onnxruntime==1.18.1
 requests==2.32.3
-pymongo==4.6.0
+pymongo==4.8.0
+beautifulsoup4==4.12.2
+python-whois==0.7.3
+tldextract==5.1.2
+pandas==2.2.2
