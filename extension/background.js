@@ -1,82 +1,85 @@
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Phishing Detector extension installed");
+  updateWhitelist();
+  setInterval(updateWhitelist, 3600000); // Update every hour
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
     console.log(`Checking URL: ${tab.url}`);
+    const whitelist = await getWhitelist();
     chrome.scripting.executeScript(
       {
         target: { tabId: tabId },
-        func: () => document.documentElement.innerHTML,
+        func: parseAndCheckLinks,
+        args: [whitelist],
       },
       (results) => {
         if (results && results[0] && results[0].result) {
-          const sourceCode = results[0].result;
-          console.log("Source code length:", sourceCode.length);
-          checkPhishing(tab.url, sourceCode);
+          const links = results[0].result;
+          console.log("Collected links:", links);
+          checkLinks(links, tabId);
         }
       }
     );
   }
 });
 
-function checkPhishing(url, sourceCode) {
-  console.log(`Checking site: ${url}`);
+function getWhitelist() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["whitelist"], (result) => {
+      resolve(result.whitelist || []);
+    });
+  });
+}
 
-  const sourceCodeBase64 = btoa(unescape(encodeURIComponent(sourceCode)));
-  console.log("Source code converted to Base64.");
+function parseAndCheckLinks(whitelist = []) {
+  const links = Array.from(document.querySelectorAll("a[href]"))
+    .map((link) => link.href)
+    .filter((href) => {
+      const hostname = new URL(href).hostname;
+      return (
+        hostname !== window.location.hostname && !whitelist.includes(hostname)
+      );
+    });
 
-  const userDeviceInfo = navigator.userAgent;
-  const apiUrl = `http://test.com/api?key=${encodeURIComponent(
-    userDeviceInfo
-  )}`;
+  return links;
+}
 
-  // Mocking the fetch response
-  setTimeout(() => {
-    const mockResponse = { phishing: false };
+function checkLinks(links, tabId) {
+  console.log(`Checking links: ${links}`);
 
-    console.log("Mocked response from backend:", mockResponse);
-
-    if (mockResponse.phishing) {
-      console.log("Phishing detected! Notifying content script.");
-
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        chrome.tabs.sendMessage(tabs[0].id, { isPhishing: true });
-      });
-    } else {
-      console.log("No phishing detected.");
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        chrome.tabs.sendMessage(tabs[0].id, { isPhishing: false });
-      });
-    }
-  }, 1000);
-  /*
-    fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sourceCode: sourceCodeBase64, url }),
+  const apiUrl = "http://localhost:5001/predict";
+  fetch(apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ links }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      return response.json();
     })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        console.log("Response from backend:", data);
-  
-        if (data.phishing) {
-          console.log("Phishing detected! Notifying content script.");
-  
-          // Send a message to the content script indicating that this is a phishing site
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            chrome.tabs.sendMessage(tabs[0].id, { isPhishing: true });
-          });
-        } else {
-          console.log("No phishing detected.");
-        }
-      })
-      .catch((error) => console.error("Error contacting backend:", error));
-    */
+    .then((data) => {
+      console.log("Response from backend:", data);
+      chrome.tabs.sendMessage(tabId, { links: data.links });
+    })
+    .catch((error) => console.error("Error contacting backend:", error));
+}
+
+function updateWhitelist() {
+  const whitelist = []; // Initialize the whitelist variable
+  console.log("invoked get whitelist");
+
+  const whitelistUrl = "http://localhost:5001/whitelist";
+
+  fetch(whitelistUrl)
+    .then((response) => response.json())
+    .then((data) => {
+      chrome.storage.local.set({ whitelist: data.links }, () => {
+        console.log("Whitelist updated:", data.links);
+      });
+    })
+    .catch((error) => console.error("Error updating whitelist:", error));
 }

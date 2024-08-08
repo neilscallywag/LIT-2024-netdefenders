@@ -1,0 +1,7 @@
+services:
+  web:
+    build: ./API/
+    ports:
+      - '5001:5000'
+
+
