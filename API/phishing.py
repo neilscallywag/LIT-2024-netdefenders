@@ -3,50 +3,20 @@ import onnxruntime
 from huggingface_hub import hf_hub_download
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
+from pymongo.mongo_client import MongoClient
 import logging
 
 app = Flask(__name__)  # initialize a flask application
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:root@localhost:3306/OnlineHarm'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# MongoDB connection string
+uri = "mongodb+srv://root:root@netdefenders.0c3hj.mongodb.net/?retryWrites=true&w=majority&appName=netdefenders"
+# Create a new client and connect to the server
+client = MongoClient(uri)
+# Access the specific database and collection
+db = client["websites"]
+collection = db["risk_rating"]
 
 CORS(app)
-
-db = SQLAlchemy(app)
-
-'''
-SQL Set up code
--- Create the database
-CREATE DATABASE OnlineHarm;
-
--- Use the database
-USE OnlineHarm;
-
--- Create the table
-CREATE TABLE Websites (
-    url VARCHAR(256) NOT NULL PRIMARY KEY,
-    risk_rating FLOAT NOT NULL
-);
-
-'''
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-class Website(db.Model):
-    __tablename__ = 'Websites'
-
-    url = db.Column(db.String(256), primary_key=True)
-    risk_rating = db.Column(db.Float, nullable=False)
-
-    def __init__(self, url, risk_rating):
-        self.url = url
-        self.risk_rating = risk_rating
-    
-    def json(self):
-        return {"url": self.url, "risk_rating": self.risk_rating}
-
 
 # Downloading the pre-trained model from the Hugging Face Hub
 REPO_ID = "pirocheto/phishing-url-detection"
@@ -63,39 +33,34 @@ sess = onnxruntime.InferenceSession(
 def predict():
   data = request.get_json()
 
-  email = data["url"]
-
-  urls = [
-      email
-  ]
+  urls = data["links"]
 
   # Converting the input data into a NumPy array for the ONNX model
   inputs = np.array(urls, dtype="str")
 
   # Using the ONNX model to make predictions on the input data
   results = sess.run(None, {"inputs": inputs})[1]
+  output = {
+    "links": []
+  }
 
   for url, proba in zip(urls, results):
-      output = {
-        "url": url,
-        "phishing_probability":  proba.item() if np.isscalar(proba) else proba[0].item()
-      }
+    # Check if the website is safe based on the results of the API call
+    safe_status = True
+    if proba[0] > 0.7:
+      safe_status = False
 
-      website = Website(output["url"], output["phishing_probability"])
-      try:
-        db.session.add(website)
-        db.session.commit()
-      except Exception as e:
-          logger.error(f"Error occurred: {e}")
-          return jsonify(
-              {
-                  "data": {
-                      "website": output['url'],
-                      "phishing_probability": output['phishing_probability']
-                  },
-                  "message": "An error occurred creating the website entry."
-              }
-          ), 500
+    # Add the results to the output
+    output['links'].append([
+        url, safe_status
+    ])
+    # Store the information into MongoDB
+    document = {
+        "url": url,
+        "safe_status": safe_status,
+        "probability": proba[0].item()  # Store the probability as well
+    }
+    collection.insert_one(document)
 
   return jsonify(output)
 
