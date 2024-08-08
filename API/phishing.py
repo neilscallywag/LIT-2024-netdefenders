@@ -4,7 +4,6 @@ from huggingface_hub import hf_hub_download
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo.mongo_client import MongoClient
-import logging
 
 app = Flask(__name__)  # initialize a flask application
 
