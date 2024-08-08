@@ -49,54 +49,37 @@ function parseAndCheckLinks(whitelist = []) {
 function checkLinks(links, tabId) {
   console.log(`Checking links: ${links}`);
 
-  // Mocking the fetch response
-  setTimeout(() => {
-    const mockResponse = links.map((link) => [link, Math.random() < 0.5]);
-
-    console.log("Mocked response from backend:", mockResponse);
-
-    chrome.tabs.sendMessage(tabId, { links: mockResponse });
-  }, 1000);
-  /*
-    fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ links }),
+  const apiUrl = "http://localhost:5001/predict";
+  fetch(apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ links }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      return response.json();
     })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        console.log("Response from backend:", data);
-        chrome.tabs.sendMessage(tabId, { links: data });
-      })
-      .catch((error) => console.error("Error contacting backend:", error));
-    */
+    .then((data) => {
+      console.log("Response from backend:", data);
+      chrome.tabs.sendMessage(tabId, { links: data.links });
+    })
+    .catch((error) => console.error("Error contacting backend:", error));
 }
 
 function updateWhitelist() {
+  const whitelist = []; // Initialize the whitelist variable
   console.log("invoked get whitelist");
-  // Example whitelist data for testing purposes
-  const whitelist = ["example.com", "google.com"];
 
-  chrome.storage.local.set({ whitelist }, () => {
-    console.log("Whitelist updated:", whitelist);
-  });
-
-  // Uncomment the following lines to fetch the whitelist from a remote URL
-  /*
-  const whitelistUrl = "https://example.com/whitelist";
+  const whitelistUrl = "http://localhost:5001/whitelist";
 
   fetch(whitelistUrl)
     .then((response) => response.json())
     .then((data) => {
-      chrome.storage.local.set({ whitelist: data }, () => {
-        console.log("Whitelist updated:", data);
+      chrome.storage.local.set({ whitelist: data.links }, () => {
+        console.log("Whitelist updated:", data.links);
       });
     })
     .catch((error) => console.error("Error updating whitelist:", error));
-  */
 }

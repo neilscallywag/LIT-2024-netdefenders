@@ -1,4 +1,3 @@
-// Function to create and inject CSS styles into the document
 function injectStyles() {
   const style = document.createElement("style");
   style.textContent = `
@@ -71,7 +70,6 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-// Call the injectStyles function to ensure styles are added
 injectStyles();
 
 function createPopup(link) {
@@ -173,7 +171,6 @@ function highlightPhishingLinks(links) {
   });
 }
 
-// Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("Message received from background script:", message);
 
