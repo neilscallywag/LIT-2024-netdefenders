@@ -187,7 +187,13 @@ def process_url(url):
     results = sess.run(None, {"inputs": inputs})[1]
     proba = results[0][0]
 
-    safe_status = bool(proba <= 0.7)
+    # Apply greedy logic
+    if trust_score >= 60 and proba <= 0.5:
+        safe_status = True
+    elif trust_score < 40 or proba > 0.8:
+        safe_status = False
+    else:
+        safe_status = bool(proba <= 0.7)
 
     cache[url] = (safe_status, float(proba))
 
@@ -248,6 +254,7 @@ def predict():
     logging.info(s.getvalue())
 
     return jsonify(output)
+
 
 @app.route("/whitelist", methods=["GET"])
 def whitelist():
