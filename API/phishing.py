@@ -61,8 +61,11 @@ def retrieve_blacklist():
 def insert_phishing_link(url):
     collection_phishing_links = retrieve_blacklist()
     if url not in collection_phishing_links:
-        phishing_list.insert_one({'url':url})
-        logging.info(f"Adding: {url} to collection of known bad websites")
+        try:
+            phishing_list.insert_one({'url':url})
+            logging.info(f"Successfully added: {url} to collection of known bad websites")
+        except Exception as e:
+            logging.error(f"Insertion exception occurred {e}")
     else:
         logging.info(f"Skipping: {url}. Entry already exist in collection of known bad websites")
 
@@ -245,8 +248,16 @@ def predict():
     pr.enable()
     data = request.get_json()
     urls = data["links"]
-
     output = {"links": []}
+    collection_phishing_links = retrieve_blacklist()
+
+    # skip checking of known bad websites
+    for url in urls:
+        if url in collection_phishing_links:
+            logging.info(f"{url} is a known phishing site. Removing for query list.")
+            output['links'].append([url, False])
+            urls.remove(url)
+
     domain_groups = group_urls_by_domain(urls)
     futures = [executor.submit(process_url, url) for domain in domain_groups.values() for url in domain]
     results = [future.result() for future in futures]
