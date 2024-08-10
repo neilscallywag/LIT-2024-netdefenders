@@ -17,3 +17,8 @@ down:
 	@docker compose -p $(PROJECT_NAME) \
 				    -f $(LOCAL_DEPLOY_DIR)/compose.yml \
 				    down
+
+down-clean:
+	@docker compose -p $(PROJECT_NAME) \
+				    -f $(LOCAL_DEPLOY_DIR)/compose.yml \
+				    down --volumes --remove-orphans
